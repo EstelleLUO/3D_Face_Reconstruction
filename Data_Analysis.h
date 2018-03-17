@@ -16,11 +16,10 @@ using namespace cv;
 #include <sstream>
 #include "math.h"
 #include <vector>
-#define w 400
 #include "Data_Analysis.hpp"
 
 using namespace std;
-vector<double> Depth_Grouping();
+vector<double> Depth_Grouping(string path);
 //Mat Histogram::DepthGrouping(const cv::Mat &image, int minValue);
 
 #endif /* Data_Analysis_hpp */
