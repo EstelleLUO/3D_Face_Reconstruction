@@ -12,8 +12,10 @@ using namespace cv;
 #include <sstream>
 #include <stdio.h>
 #include "math.h"
-#define w 400
 #include "Data_Analysis.hpp"
+#include "Reconstruction_to_3D.hpp"
+#include "Transformation_to_2D.hpp"
+#include "image_info.hpp"
 
 using namespace std;
 /*
