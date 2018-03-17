@@ -128,7 +128,7 @@ int trans_2D(string path){
     // Save Image
     namedWindow("Display Window", WINDOW_AUTOSIZE);
     imshow("Display Window", image);
-    imwrite("/Users/estelle/Documents/faceFitResult/2D_Transformation/depth_map.bmp", image);
+    imwrite("/Users/estelle/Documents/faceFitResult/2D_Transformation/depth_map.png", image);
     //waitKey(0);
     //destroyAllWindows();
     
