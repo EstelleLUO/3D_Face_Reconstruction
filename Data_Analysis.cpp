@@ -19,14 +19,14 @@ using namespace cv;
 
 using namespace std;
 
-vector<double> Depth_Grouping(){
+vector<double> Depth_Grouping(string path){
     vector<double> depth_LUT;
     vector<double> depth_grouping;
     string x_string;
     string y_string;
     string z_string;
     ifstream infile;
-    infile.open("statue_head.txt", ios::in);
+    infile.open(path, ios::in);
     while (!infile.eof()){
         infile >> x_string >> y_string >> z_string;
         //string stream(x_string);
