@@ -29,6 +29,6 @@ using namespace cv;
 #include "Data_Analysis.hpp"
 
 using namespace std;
-int recons_3D();
+int recons_3D(out_path);
 
 #endif /* Reconstruction_to_3D_hpp */
