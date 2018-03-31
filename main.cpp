@@ -29,9 +29,10 @@ void drawDepthmap(double x_map,double y_map, double depth){
 */
 int main() {
     string path = "/Users/estelle/Documents/faceFitResult/2D_Transformation/position.txt";
-    
+    string out_path ="/Users/estelle/Documents/faceFitResult/2D_Transformation/depth_map.bmp";
+   
     trans_2D(path);
-    recons_3D();
+    recons_3D(out_path);
     
     input_image();
     return 0;
