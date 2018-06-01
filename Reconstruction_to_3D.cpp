@@ -33,25 +33,13 @@ using namespace std;
  * with data of each pixels in it
  */
 int recons_3D(string path){
+    // Recons_3D read into depth_map.bmp and carries out image processing on it
+    // Then it outputs an new_depth_map which is new result_image
     Mat image = imread(path);
-    /*
-    int nl= image.rows; //行数
-    int nc= image.cols * image.channels(); // 每行的元素个数，每行的像素数*颜色通道数（RGB = 3）
-    
-    for (int j=0; j<nl; j++) {
-        uchar* data= image.ptr<uchar>(j);
-        for (int i=0; i<nc; i++) {
-            // process each pixel ---------------------
-            //data[i]= data[i]/div*div + div/2;
-            data[i]=0;
-            // end of pixel processing ----------------
-        } // end of line
-    }
-     */
-    
-    
+   
     Mat out_image;
     out_image = image.clone();
+    
     
     int rows = out_image.rows;
     int cols = out_image.cols;
@@ -61,22 +49,22 @@ int recons_3D(string path){
     for (int i=0;i<rows;i++){
         for (int j=0;j<cols;j++){
             count++;
-            if (out_image.at<Vec3b>(i,j)[0]!=0){
-                cout<<out_image.at<Vec3b>(i,j)[0]<<endl;
-                depth.push_back(out_image.at<Vec3b>(i,j)[0]);
+            double current =(double)out_image.at<Vec3b>(i,j)[0];
+            if (current!=0){
+                depth.push_back(current);
                 depth.push_back(count);
                 count=0;
             }
         }
     }
 
-    /*
     int mark =0;
     int step =1;
     for (int i=0;i<rows;i++){
         for (int j=0;j<cols;j++){
-            if (out_image.at<Vec3b>(i,j)[0]==0){
-                if (mark!=0 || mark!=depth.size()-2){
+            double current =(double)out_image.at<Vec3b>(i,j)[0];
+            if (current==0){
+                if (mark!=0 || mark!=depth.size()-1){
                     out_image.at<Vec3b>(i,j)[0]=((depth[mark+2])-depth[mark])/(depth[mark+1])*step+depth[mark];
                     out_image.at<Vec3b>(i,j)[1]=((depth[mark+2])-depth[mark])/(depth[mark+1])*step+depth[mark];
                     out_image.at<Vec3b>(i,j)[2]=((depth[mark+2])-depth[mark])/(depth[mark+1])*step+depth[mark];
@@ -91,35 +79,17 @@ int recons_3D(string path){
             }
             else{
                 mark=mark+2;
-                step=0;
+                step=1;
             }
         }
     }
-
-    */
+    
     
     namedWindow("Display Window", WINDOW_AUTOSIZE);
     imshow("Display Window", out_image);
     imwrite("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_depth_map.bmp", out_image);
     //waitKey(0);
-/*
-    ofstream outfile("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_result.txt",ios::trunc);
-    
-    
-    for (int i=0;i<rows;i++){
-        for (int j=0;j<cols;j++){
-            unsigned char test0 = out_image.at<Vec3b>(i,j)[0];
-            int testn=test0;
-            //unsigned char test1 = out_image.at<Vec3b>(i,j)[1];
-            //unsigned char test2 = out_image.at<Vec3b>(i,j)[2];
-            //unsigned char num[1]={test0};
-            //outfile.write((char*)num,sizeof(num));
-            outfile << testn;
-            
-            //outfile << image;
-        }
-    }
-*/
+
     trans_3D("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_depth_map.bmp");
     return 0;
 }
@@ -134,14 +104,42 @@ void trans_3D(string path){
     const double pi = atan(1)*4;
     double x_map;
     double y_map;
-    unsigned char depth;
+    //unsigned char depth;
+    double depth;
     double x_3d;
     double y_3d;
     double z_3d; // These three coordinates are in Mashlabs form, which is different from normal norm.
     
+    vector<double> depth_grouping;
+    string x_string;
+    string y_string;
+    string z_string;
+
+    ifstream infile;
+    string original_path = "/Users/estelle/Documents/faceFitResult/2D_Transformation/result.txt";
+    infile.open(original_path, ios::in);
+    while (!infile.eof()){
+        infile >> x_string >> y_string >> z_string;
+        string stream(x_string);
+        double y = stod(x_string);
+        double z = stod(y_string);
+        double x = stod(z_string);
+        
+        double depth =sqrt(x*x+y*y+z*z);
+        depth_grouping.push_back(depth);
+    }
+    
+    vector<double>::iterator max = max_element(begin(depth_grouping), end(depth_grouping));
+    vector<double>::iterator min = min_element(begin(depth_grouping), end(depth_grouping));
+    
+    double max_double = *max;
+    double min_double = *min;
+    cout << max_double<<"original max"<<endl;
+    cout << min_double<<"original min"<<endl;
     ofstream outfile("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_result.txt",ios::trunc);
     
     for (int i=cols/2;i<(3*cols/4);i++)
+        //x>0 y>0 z>0
     // Why i = 360 cannot work?
     //for (int i = 361;i<540;i++)
     {
@@ -149,9 +147,11 @@ void trans_3D(string path){
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            //new_depth = (double) depth;
+            //cout << new_depth<<endl;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = depth*cos(y_map*pi/(2*180));
             x_3d = depth*sin(y_map*pi/360)*sin((x_map-360)*pi/360);
             z_3d = depth*sin(y_map*pi/360)*cos((x_map-360)*pi/360);
@@ -159,12 +159,12 @@ void trans_3D(string path){
             outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
             
         }
-        for (int j=rows/2;j<=rows;j++)
+        for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = - depth*cos((360-y_map)*pi/360);
             x_3d = depth*sin((360-y_map)*pi/360)*sin((x_map-360)*pi/360);
             z_3d = depth*sin((360-y_map)*pi/360)*cos((x_map-360)*pi/360);
@@ -180,9 +180,9 @@ void trans_3D(string path){
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = depth*cos(y_map*pi/360);
             z_3d = - depth*sin(y_map*pi/360)*sin((x_map-540)*pi/360);
             x_3d = depth*sin(y_map*pi/360)*cos((x_map-540)*pi/360);
@@ -190,14 +190,14 @@ void trans_3D(string path){
             outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
             
         }
-        for (int j=rows/2;j<=rows;j++)
+        for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = - depth*cos((360-y_map)*pi/360);
-            z_3d = - depth*sin((360-y_map)*pi/360)*cos((x_map-540)*pi/360);
+            z_3d = - depth*sin((360-y_map)*pi/360)*sin((x_map-540)*pi/360);
             x_3d = depth*sin((360-y_map)*pi/360)*cos((x_map-540)*pi/360);
             //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
             outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
@@ -211,9 +211,9 @@ void trans_3D(string path){
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = depth*cos((y_map)*pi/360);
             x_3d = - depth*sin((y_map)*pi/360)*sin(x_map*pi/360);
             z_3d = - depth*sin((y_map)*pi/360)*cos(x_map*pi/360);
@@ -221,12 +221,12 @@ void trans_3D(string path){
             outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
             
         }
-        for (int j=rows/2;j<=rows;j++)
+        for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = - depth*cos((360-y_map)*pi/360);
             x_3d = - depth*sin((360-y_map)*pi/360)*sin(x_map*pi/360);
             z_3d = - depth*sin((360-y_map)*pi/360)*cos(x_map*pi/360);
@@ -242,21 +242,21 @@ void trans_3D(string path){
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = depth*cos(y_map*pi/360);
             z_3d = depth*sin(y_map*pi/360)*sin((x_map-180)*pi/360);
             x_3d = - depth*sin(y_map*pi/360)*cos((x_map-180)*pi/360);
             outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
             
         }
-        for (int j=rows/2;j<=rows;j++)
+        for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = image.at<Vec3b>(y_map,x_map)[0];
-            //if (depth == 255) break;
-            //depth = depth*(max_double - min_double)/255+min_double;
+            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            if (depth == 0) continue;
+            depth = depth*(max_double - min_double)/255+min_double;
             y_3d = -depth*cos((360-y_map)*pi/360);
             z_3d = depth*sin((360-y_map)*pi/360)*sin((x_map-180)*pi/360);
             x_3d = - depth*sin((360-y_map)*pi/360)*cos((x_map-180)*pi/360);
@@ -266,4 +266,5 @@ void trans_3D(string path){
     }
     return;
 }
+
 
