@@ -19,6 +19,13 @@ using namespace cv;
 
 using namespace std;
 
+/*
+ * This cpp works with Transformation_to_2D.
+ * By grouping the value to depth, we assign each pixel with different values
+ * to represent depth value in the representation of RGB
+ */
+
+
 vector<double> Depth_Grouping(string path){
     vector<double> depth_LUT;
     vector<double> depth_grouping;
@@ -40,10 +47,13 @@ vector<double> Depth_Grouping(string path){
    
     vector<double>::iterator max = max_element(begin(depth_grouping), end(depth_grouping));
     vector<double>::iterator min = min_element(begin(depth_grouping), end(depth_grouping));
-    depth_LUT = depth_grouping;
     
+    depth_LUT = depth_grouping;
     for (int i = 0; i<depth_grouping.size();i++){
-        depth_LUT[i] =round((255.0*(depth_grouping[i]- *min)/(*max - *min)+0.5));
+        //depth_LUT[i] =round(255.0*(depth_grouping[i]- *min)/(*max - *min)+0.5);
+        depth_LUT[i] =round(65535.0*(depth_grouping[i]- *min)/(*max - *min));
     }
+    
+    
     return depth_LUT;
 }
