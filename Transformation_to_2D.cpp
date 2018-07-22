@@ -6,11 +6,15 @@
 //  Copyright © 2018 Estelle. All rights reserved.
 //
 
+
+/*
+ * This cpp includes codes to transfrom 3D cloud map to 2D depthmap
+ */
 #include "Transformation_to_2D.hpp"
 
 int trans_2D(string path){
     // Create a new image
-    Mat image(360,720,CV_8UC3,Scalar(0,0,0));
+    Mat image(360,720,CV_16UC1,Scalar(0));
     
     string x_string;
     string y_string;
@@ -23,7 +27,6 @@ int trans_2D(string path){
     double x_map;
     double y_map;
     double depth;
-    Vec3b pixel;
     int i = 0;
     infile.open(path, ios::in);
     if (infile.fail()){
@@ -37,28 +40,21 @@ int trans_2D(string path){
         double x = stod(z_string);
         // Divide the sphere into eight parts
         depth =sqrt(x*x+y*y+z*z);
+        //int rows = image.rows;
+        //int cols = image.cols;
         
+        unsigned short int pixel = (unsigned short int)depth_LUT[i];
         
-        pixel[0] = depth_LUT[i];
-        pixel[1] = depth_LUT[i];
-        pixel[2] = depth_LUT[i];
-        
-        
-        if (x>0&&y>=0&&z>=0){
+        if (x>0&&y>0&&z>=0){
             x_map = round(atan(y/x)*2/pi*180)+360;
             y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
         }
         
-        /*
-         if (y>=0&&z>=0){
-         x_map = round(atan(y/x)*2/pi*180)+360;
-         y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
-         }
-         else if (y<0 && z>=0){
-         x_map = 360 - round(atan((-y)/x)*2/pi*180);
-         y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
-         }
-         */
+        else if (x>0&&y==0&&z>=0)
+        {
+            x_map=360;
+            y_map =round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
+        }
         
         else if (x>0 && y<0&&z>=0){
             x_map = round(atan(x/(-y))*2/pi*180)+180;
@@ -66,38 +62,40 @@ int trans_2D(string path){
             
         }
         
-        else if (x<0 && y>=0&&z>=0){
+        else if (x<0 && y>0&&z>=0){
             x_map = round(atan((-x)/y)*2/pi*180)+540;
             y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
         }
+        else if (x<0 && y==0&&z>=0){
+            x_map = 540;
+            y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
+        }
+            
         else if(x<0 && y<0&&z>=0){
             x_map = round(atan(y/x)*2/pi*180);
             y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
         }
         
-        /*
-         else if (y>=0&&z<0){
-         x_map = round(atan(y/x)*360/pi)+360;
-         y_map = 180 - round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
-         }
-         
-         else{
-         x_map = 360 - round(atan((-y)/x)*360/pi);
-         y_map = 180 - round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
-         }
-         */
-        
-        else if (x>0&&y>=0&&z<0){
+        else if (x>0&&y>0&&z<0){
             x_map = round(atan(y/x)*2/pi*180)+360;
             y_map = 360- round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
         }
+        else if (x>0&&y==0&&z<0){
+            x_map = 360;
+            y_map = 360- round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
+        }
+
         else if (x>0 && y<0&&z<0){
             x_map =round(atan(x/(-y))*2/pi*180)+180;
             y_map =360- round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
         }
         
-        else if (x<0 && y>=0&&z<0){
+        else if (x<0 && y>0&&z<0){
             x_map = round(atan((-x)/y)*2/pi*180)+540;
+            y_map = 360- round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
+        }
+        else if (x<0 && y==0&&z<0){
+            x_map = 540;
             y_map = 360- round(asin(sqrt(x*x+y*y)/depth)*2/pi*180);
         }
         else if (x<0 && y<0&&z<0){
@@ -121,7 +119,8 @@ int trans_2D(string path){
             x_map = 180;
             y_map = round(asin(sqrt(x*x+y*y)/depth)*2/pi*180)+180;
         }
-        image.at<Vec3b>(y_map,x_map) = pixel;
+        image.at<ushort>(y_map,x_map) = pixel;
+    
         i++;
     }
     
