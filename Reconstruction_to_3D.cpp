@@ -26,6 +26,9 @@ using namespace cv;
 #include "Reconstruction_to_3D.hpp"
 #include <stdio.h>
 #include <vector>
+#include "Reconstruction_of_mesh.hpp"
+#include "Image_filter.hpp"
+#include "Resolution.hpp"
 using namespace std;
 
 /*
@@ -35,69 +38,113 @@ using namespace std;
 int recons_3D(string path){
     // Recons_3D read into depth_map.bmp and carries out image processing on it
     // Then it outputs an new_depth_map which is new result_image
-    Mat image = imread(path);
+    Mat image = imread(path,CV_LOAD_IMAGE_UNCHANGED);
    
     Mat out_image;
     out_image = image.clone();
     
-    
+    const double pi = atan(1)*4;
     int rows = out_image.rows;
     int cols = out_image.cols;
     
-    vector<int> depth;
-    int count=0;
-    for (int i=0;i<rows;i++){
-        for (int j=0;j<cols;j++){
-            count++;
-            double current =(double)out_image.at<Vec3b>(i,j)[0];
-            if (current!=0){
-                depth.push_back(current);
-                depth.push_back(count);
-                count=0;
+/***************************************************************************************
+ * Reconstruct the sparse points to be more densed ones
+ */
+
+//    for (int i=1;i<rows-1;i++){
+//        for (int j=1;j<cols-1;j++){
+//            //if (flag ==1) continue;
+//            unsigned short int current =(unsigned short int)out_image.at<ushort>(i,j);
+//            //unsigned char next =out_image.at<Vec3b>(i,j+1)[0];
+//            //flag=0;
+//            //if (next!=0) flag=1;
+//            if (current!=0){
+//
+//                out_image.at<ushort>(i,j-1)=current;
+//
+//
+//                out_image.at<ushort>(i-1,j-1)=current;
+//
+//                out_image.at<ushort>(i-1,j)=current;
+//            }
+//        }
+//    }
+//
+//    change_resolution(out_image);
+
+//    Mat temp_img = imread("/Users/estelle/Documents/faceFitResult/2D_Transformation/resolution_map.png",CV_LOAD_IMAGE_UNCHANGED);
+//    change_resolution(temp_img);
+    Mat img = imread("/Users/estelle/Documents/faceFitResult/2D_Transformation/depth_map.png",CV_LOAD_IMAGE_UNCHANGED);
+    //Mat img = out_image.clone();
+    
+    int new_rows = img.rows;
+    int new_cols = img.cols;
+    for (int i = 0; i<new_rows;i++){
+        int startPoint=-1;  //depth info
+        int endPoint = -1;
+        int startcols = -1;  //position
+        int endcols = -1;
+
+        for (int j = 0;j <new_cols;j++){
+            unsigned short int start = (unsigned short int)img.at<ushort>(i,j);
+            if(start != 0){
+                startPoint = start;
+                startcols = j;
+                for (int x=new_cols-1;x>=j;x--){
+                    unsigned short int end = (unsigned short int) img.at<ushort>(i,x);
+                    if (end != 0){
+                        endPoint = end;
+                        endcols = x;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        double distToOrigin = 7;
+        int step = startcols+new_cols-endcols;
+        double step_size =(double) (endPoint-startPoint)/step;
+        if (startcols == endcols || startcols == -1) continue;
+        else{
+            for (int m=0;m<=startcols;m++){
+                int distance = startcols-m;
+                double step_index=distance*step_size + startPoint;
+                double radius = sqrt(step_index*step_index+distToOrigin*distToOrigin-2*distToOrigin*step_index*cos((180-m)/pi));
+                img.at<ushort>(i,m) = radius;
+            }
+
+            for (int n=new_cols-1;n>=endcols;n--){
+                int distance = startcols+new_cols-n;
+                double step_index=distance*step_size + startPoint;
+                double radius = sqrt(step_index*step_index+distToOrigin*distToOrigin-2*distToOrigin*step_index*cos((180-n)/pi));
+                img.at<ushort>(i,n) = radius;
             }
         }
     }
 
-    int mark =0;
-    int step =1;
-    for (int i=0;i<rows;i++){
-        for (int j=0;j<cols;j++){
-            double current =(double)out_image.at<Vec3b>(i,j)[0];
-            if (current==0){
-                if (mark!=0 || mark!=depth.size()-1){
-                    out_image.at<Vec3b>(i,j)[0]=((depth[mark+2])-depth[mark])/(depth[mark+1])*step+depth[mark];
-                    out_image.at<Vec3b>(i,j)[1]=((depth[mark+2])-depth[mark])/(depth[mark+1])*step+depth[mark];
-                    out_image.at<Vec3b>(i,j)[2]=((depth[mark+2])-depth[mark])/(depth[mark+1])*step+depth[mark];
-                    step++;
-                }
-                else{
-                    out_image.at<Vec3b>(i,j)[0]=0;
-                    out_image.at<Vec3b>(i,j)[1]=0;
-                    out_image.at<Vec3b>(i,j)[2]=0;
-                    step++;
-                }
-            }
-            else{
-                mark=mark+2;
-                step=1;
-            }
-        }
-    }
     
+    // Image Filter
+
+    img = image_filter(img,5,1);
+//    img = image_filter(img,5,2);
+//    img = image_filter(img,5,2);
+//    img = image_filter(img,5,1);
+//      img = full_image_filter(img,5,1);
+//    Mat src = img.clone();
+//    GaussianBlur(src, img, Size(3,3), 1);
     
     namedWindow("Display Window", WINDOW_AUTOSIZE);
     imshow("Display Window", out_image);
-    imwrite("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_depth_map.bmp", out_image);
-    //waitKey(0);
-
-    trans_3D("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_depth_map.bmp");
+    imwrite(path, img);
+    
+    trans_3D(path);
     return 0;
 }
 
 void trans_3D(string path){
     // Get min and Max for further transformation
     
-    Mat image = imread(path);
+    Mat image = imread(path,CV_LOAD_IMAGE_UNCHANGED);
     int rows = image.rows;
     int cols = image.cols;
     
@@ -114,9 +161,11 @@ void trans_3D(string path){
     string x_string;
     string y_string;
     string z_string;
-
+    
+    // Get the max depth and the min depth
     ifstream infile;
-    string original_path = "/Users/estelle/Documents/faceFitResult/2D_Transformation/result.txt";
+    //string original_path = "/Users/estelle/Documents/faceFitResult/2D_Transformation/resolution_reference.txt";
+    string original_path = "/Users/estelle/Documents/faceFitResult/2D_Transformation/merge3d_John.txt";
     infile.open(original_path, ios::in);
     while (!infile.eof()){
         infile >> x_string >> y_string >> z_string;
@@ -136,135 +185,176 @@ void trans_3D(string path){
     double min_double = *min;
     cout << max_double<<"original max"<<endl;
     cout << min_double<<"original min"<<endl;
+ 
     ofstream outfile("/Users/estelle/Documents/faceFitResult/2D_Transformation/new_result.txt",ios::trunc);
     
+    // Record the row number that the point is in
+    //vector<vector<int>> position;
+    int temp[720] = {0};
+    vector<int> position_col(temp,temp+cols);
+    vector<vector<int> > position;
+    for (int i = 0;i<rows;i++){
+        position.push_back(position_col);
+    }
+    // Record the row number of each point in the txt file
+    int count = 0;
+    int index = 65536; // Mark the upper bound of each pixel
     for (int i=cols/2;i<(3*cols/4);i++)
-        //x>0 y>0 z>0
-    // Why i = 360 cannot work?
-    //for (int i = 361;i<540;i++)
     {
         x_map = i;
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            //new_depth = (double) depth;
-            //cout << new_depth<<endl;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = depth*cos(y_map*pi/(2*180));
-            x_3d = depth*sin(y_map*pi/360)*sin((x_map-360)*pi/360);
-            z_3d = depth*sin(y_map*pi/360)*cos((x_map-360)*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
-            
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = depth*cos(y_map*pi/rows);
+            x_3d = depth*sin(y_map*pi/rows)*sin((x_map-cols/2)*pi/rows);
+            z_3d = depth*sin(y_map*pi/rows)*cos((x_map-cols/2)*pi/rows);
+            outfile<<"v "  << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+            //int temp[2] = {j,i};
+            //vector<int> eachPosition(temp,temp+2);
+            //position.push_back(eachPosition);
         }
         for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = - depth*cos((360-y_map)*pi/360);
-            x_3d = depth*sin((360-y_map)*pi/360)*sin((x_map-360)*pi/360);
-            z_3d = depth*sin((360-y_map)*pi/360)*cos((x_map-360)*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = - depth*cos((rows-y_map)*pi/rows);
+            x_3d = depth*sin((rows-y_map)*pi/rows)*sin((x_map-cols/2)*pi/rows);
+            z_3d = depth*sin((rows-y_map)*pi/rows)*cos((x_map-cols/2)*pi/rows);
+            outfile <<"v " << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+            //int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
         }
     }
     
     for (int i=3*cols/4;i<cols;i++)
-    //for (int i = 540;i<=720;i++)
     {
         x_map = i;
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = depth*cos(y_map*pi/360);
-            z_3d = - depth*sin(y_map*pi/360)*sin((x_map-540)*pi/360);
-            x_3d = depth*sin(y_map*pi/360)*cos((x_map-540)*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
-            
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = depth*cos(y_map*pi/rows);
+            z_3d = - depth*sin(y_map*pi/rows)*sin((x_map-3*cols/4)*pi/rows);
+            x_3d = depth*sin(y_map*pi/rows)*cos((x_map-3*cols/4)*pi/rows);
+            outfile<<"v "  << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+//            int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
         }
         for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = - depth*cos((360-y_map)*pi/360);
-            z_3d = - depth*sin((360-y_map)*pi/360)*sin((x_map-540)*pi/360);
-            x_3d = depth*sin((360-y_map)*pi/360)*cos((x_map-540)*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = - depth*cos((rows-y_map)*pi/rows);
+            z_3d = - depth*sin((rows-y_map)*pi/rows)*sin((x_map-3*cols/4)*pi/rows);
+            x_3d = depth*sin((rows-y_map)*pi/rows)*cos((x_map-3*cols/4)*pi/rows);
+            outfile<<"v "  << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+//            int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
         }
     }
     
     for (int i=0;i<(cols/4);i++)
-    //for (int i = 0;i<180;i++)
     {
         x_map = i;
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = depth*cos((y_map)*pi/360);
-            x_3d = - depth*sin((y_map)*pi/360)*sin(x_map*pi/360);
-            z_3d = - depth*sin((y_map)*pi/360)*cos(x_map*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
-            
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = depth*cos((y_map)*pi/rows);
+            x_3d = - depth*sin((y_map)*pi/rows)*sin(x_map*pi/rows);
+            z_3d = - depth*sin((y_map)*pi/rows)*cos(x_map*pi/rows);
+            outfile<<"v "  << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+//            int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
         }
         for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = - depth*cos((360-y_map)*pi/360);
-            x_3d = - depth*sin((360-y_map)*pi/360)*sin(x_map*pi/360);
-            z_3d = - depth*sin((360-y_map)*pi/360)*cos(x_map*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = - depth*cos((rows-y_map)*pi/rows);
+            x_3d = - depth*sin((rows-y_map)*pi/rows)*sin(x_map*pi/rows);
+            z_3d = - depth*sin((rows-y_map)*pi/rows)*cos(x_map*pi/rows);
+            outfile<<"v "  << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+//            int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
         }
     }
     
     for (int i=cols/4;i<(cols/2);i++)
-    //for (int i = 180;i<360;i++)
     {
         x_map = i;
         for (int j = 0;j<(rows/2);j++)
         {
             y_map = j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = depth*cos(y_map*pi/360);
-            z_3d = depth*sin(y_map*pi/360)*sin((x_map-180)*pi/360);
-            x_3d = - depth*sin(y_map*pi/360)*cos((x_map-180)*pi/360);
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = depth*cos(y_map*pi/rows);
+            z_3d = depth*sin(y_map*pi/rows)*sin((x_map-cols/4)*pi/rows);
+            x_3d = - depth*sin(y_map*pi/rows)*cos((x_map-cols/4)*pi/rows);
+            outfile<<"v " << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+//            int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
             
         }
         for (int j=rows/2;j<rows;j++)
         {
             y_map=j;
-            depth = (double)image.at<Vec3b>(y_map,x_map)[0];
+            depth = (unsigned short int)image.at<ushort>(y_map,x_map);
             if (depth == 0) continue;
-            depth = depth*(max_double - min_double)/255+min_double;
-            y_3d = -depth*cos((360-y_map)*pi/360);
-            z_3d = depth*sin((360-y_map)*pi/360)*sin((x_map-180)*pi/360);
-            x_3d = - depth*sin((360-y_map)*pi/360)*cos((x_map-180)*pi/360);
-            //if (x_3d!=0) cout << x_3d<<y_3d<<z_3d;
-            outfile << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            depth = depth*(max_double - min_double)/index+min_double;
+            y_3d = -depth*cos((rows-y_map)*pi/rows);
+            z_3d = depth*sin((rows-y_map)*pi/rows)*sin((x_map-cols/4)*pi/rows);
+            x_3d = - depth*sin((rows-y_map)*pi/rows)*cos((x_map-cols/4)*pi/rows);
+            outfile<<"v " << x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            //outfile<<x_3d <<" " << y_3d <<" "<< z_3d <<endl;
+            count++;
+            position[j][i] = count;
+//            int temp[2] = {j,i};
+//            vector<int> eachPosition(temp,temp+2);
+//            position.push_back(eachPosition);
         }
     }
+    recons_Mesh(position);
     return;
 }
-
-
